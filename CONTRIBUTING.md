@@ -63,3 +63,86 @@ Como el pipeline genera dinámicamente el manifest que realmente importa para el
 *Nota: Asegúrate de que el archivo `manifest/package.xml` (o la carpeta `manifest/` si es exclusiva para esto) esté incluido en tu `.gitignore`.*
 
 ---
+
+## 4. Sincronización de Cambios (`git pull`)
+
+Cada vez que hagas un `git pull` para traer los últimos cambios de la rama principal (que refleja el estado de la Org Core), es fundamental recordar que **los cambios solo se descargan en tu repositorio local (tu computadora)**. Tu entorno de desarrollo de Salesforce (tu Org) no se actualiza automáticamente.
+
+**Pasos obligatorios después de un `git pull`:**
+
+1. **Actualizar tu rama local:**
+   Trae los cambios ejecutando `git pull` en tu terminal.
+2. **Desplegar a tu Org de desarrollo:**
+   Inmediatamente después de descargar los cambios, **debes** enviarlos a tu entorno de Salesforce. Esto garantiza que trabajes sobre la última versión y evita que, al hacer un nuevo desarrollo, sobrescribas o elimines accidentalmente el trabajo que tus compañeros acaban de subir.
+   * **Vía VS Code:** Haz clic derecho sobre la carpeta `force-app` y selecciona **SFDX: Deploy Source to Org**.
+   * **Vía Terminal (CLI):** Ejecuta el comando `sf project deploy start` (o `sfdx force:source:deploy -p force-app`).
+
+> **Importante:** Si el despliegue falla después de un pull, notifícalo a tu frente (o a Duván/Joan). Podría faltar una configuración manual en tu Org (ej. habilitar una feature, crear un registro específico) necesaria para que el nuevo código funcione.
+
+---
+
+## 5. Flujo de Pull Requests (PRs) y Revisiones
+
+La rama `main` está protegida. **El pipeline es la única vía a la organización Base: TODO cambio llega por PR**. Esto incluye metadatos de Salesforce, documentación, Runbooks y decisiones de arquitectura (ADRs). 
+
+* **Revisiones:** Todos los PRs deben pasar por una revisión técnica a cargo de Joan y Duván. 
+* **Aprobación y Merge:** Únicamente Edgar aprueba y fusiona los PRs en la rama principal (en dos ventanas diarias definidas).
+* **Prohibición estricta:** Ningún desarrollador puede hacer cambios manuales directamente en el "Setup" de la Org Base. Todo se construye y prueba en las SDOs (Scratch/Developer Orgs) de cada pareja antes de enviar el PR.
+
+---
+
+## 6. Runbooks (Pasos Manuales)
+
+Existen configuraciones o datos que no pueden viajar por metadatos a través del pipeline (por ejemplo, la creación de usuarios o asignación inicial de licencias). Todo lo que no viaje por metadata debe documentarse estrictamente como un paso manual en un **Runbook**.
+
+### Reglas para los Runbooks:
+1. **Viajan por PR:** Los Runbooks son archivos de texto (`.md`) que también deben someterse a revisión mediante un Pull Request.
+2. **Ubicación:** Todos los pasos manuales deben guardarse en la carpeta `docs/runbook/` del repositorio.
+3. **Nomenclatura del archivo:** Deben llamarse `RB-[frente]-[nn].md` (Ejemplo: `RB-f4-01.md`).
+4. **Plantilla obligatoria:** Cada archivo de Runbook debe contener: Id de la HU relacionada, justificación de por qué no viaja por metadata (con enlace a la documentación oficial), prerrequisitos, pasos exactos, resultado esperado, validación y plan de rollback.
+5. **Ejecución:** Estos pasos **NO** los ejecutas tú en la Org Base. Los ejecutarán Edgar, Joan y Duván en la Base justo después de que el release de tu HU haya sido desplegado.
+
+---
+
+## 7. Decisiones de Arquitectura (ADR) y Código Personalizado
+
+Se premia y prioriza el uso de la funcionalidad estándar de Salesforce. Si tu historia de usuario requiere crear código personalizado (Apex o LWC), **NO puedes empezar a programar de inmediato**. 
+
+Debes crear primero un registro de decisión (ADR) documentando por qué el estándar no es suficiente, enviarlo por PR y **esperar la aprobación de Edgar** antes de construir la solución técnica.
+
+---
+
+## 8. Recuperar Cambios Declarativos (Retrieve desde tu SDO)
+
+Cada frente (f1, f2, f3, f4) trabaja de forma aislada en su propia SDO (Scratch/Developer Org). La rama `main` refleja el estado de la **Org Base (Core)**. 
+
+Si creas o modificas algo directamente en el *Setup* de tu SDO usando la interfaz de Salesforce (por ejemplo: un Custom Object, un campo nuevo, un Flow o un Permission Set), Git no se enterará automáticamente. **Es tu responsabilidad extraer (retrieve) esa metadata a tu computadora** antes de hacer commit.
+
+### Pasos para hacer Retrieve de tus cambios:
+
+1. **Haz el cambio en tu SDO:** Construye y prueba la funcionalidad en la interfaz de Salesforce.
+2. **Genera un Manifest temporal (Dos opciones):** 
+   Un manifest (`package.xml`) le dice a VS Code exactamente qué descargar. Dado que creaste cosas en la SDO, necesitas armar este archivo indicando qué quieres recuperar. *(Recuerda la Regla 3: Este archivo es solo para tu uso local, ¡asegúrate de que esté en tu `.gitignore`!)*
+
+   * **Opción A: Usando Salesforce Inspector (Extensión de navegador)**
+     1. Ve a tu SDO en el navegador y abre **Salesforce Inspector** (o Inspector Reloaded).
+     2. Haz clic en la opción **Download Metadata**.
+     3. En la lista, busca y selecciona los tipos de componentes que modificaste (por ejemplo, `CustomObject`, `Flow`, `ApexClass`).
+     4. La herramienta generará en pantalla un bloque de código XML con tus selecciones.
+     5. Copia ese código XML.
+     6. Ve a VS Code, crea (o abre) el archivo `manifest/package.xml` temporal y pega el código allí.
+
+   * **Opción B: Usando SFDX Package.xml Generator (Extensión de VS Code)**
+     1. Asegúrate de tener instalada la extensión **Salesforce Package.xml Generator** en VS Code.
+     2. Abre la paleta de comandos (`Ctrl+Shift+P` en Windows o `Cmd+Shift+P` en Mac).
+     3. Escribe y selecciona: **SFDX Package.xml Generator: Choose Metadata Components**.
+     4. Se abrirá una interfaz visual dentro de VS Code que leerá tu SDO.
+     5. Navega por las carpetas (ej. *CustomObject*, *Flow*) y marca únicamente las casillas de los metadatos exactos que tú creaste o modificaste.
+     6. Haz clic en el botón **Update Package.xml**. La herramienta armará el archivo automáticamente por ti en tu carpeta `manifest/`.
+3. **Descarga la Metadata (Retrieve):**
+   * **Vía Manifest:** Haz clic derecho sobre tu `package.xml` temporal en VS Code y selecciona **SFDX: Retrieve Source in Manifest from Org**.
+   * **Vía Org Browser (VS Code):** Ve al ícono de la nube en la barra lateral, busca el componente que creaste y haz clic en el ícono de descarga (Retrieve Source from Org).
+   * **Vía Terminal (CLI):** Puedes pedir un componente específico directamente por consola:
+     `sf project retrieve start -m CustomObject:Mascota__c`
+4. **Verifica los archivos:** Asegúrate de que los archivos `.xml` (o las carpetas correspondientes) hayan aparecido dentro de tu carpeta `force-app/main/default/...`.
+5. **Haz Commit y Push:** Ahora esos archivos XML forman parte de tu repositorio local y están listos para viajar en tu Pull Request hacia la Org Base.
