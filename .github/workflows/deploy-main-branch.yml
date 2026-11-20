@@ -1,0 +1,104 @@
+name: Desplegar
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'force-app/**'
+
+concurrency:
+  group: huellitas-org
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  desplegar:
+    name: Desplegar
+    runs-on: ubuntu-latest
+    steps:
+      - name: Bajar el repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Instalar Salesforce CLI
+        run: npm install --global @salesforce/cli
+
+      - name: Instalar sfdx-git-delta
+        run: echo y | sf plugins install sfdx-git-delta
+
+      - name: Guardar la llave JWT
+        env:
+          JWT_KEY: ${{ secrets.ORG_JWT_KEY }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/jwt"
+          printf '%s\n' "$JWT_KEY" > "$RUNNER_TEMP/jwt/server.key"
+          chmod 600 "$RUNNER_TEMP/jwt/server.key"
+
+      - name: Autenticar contra la org
+        env:
+          ORG_CLIENT_ID: ${{ secrets.ORG_CLIENT_ID }}
+          ORG_USERNAME: ${{ secrets.ORG_USERNAME }}
+          ORG_INSTANCE_URL: ${{ secrets.ORG_INSTANCE_URL }}
+        run: |
+          sf org login jwt \
+            --client-id "$ORG_CLIENT_ID" \
+            --jwt-key-file "$RUNNER_TEMP/jwt/server.key" \
+            --username "$ORG_USERNAME" \
+            --instance-url "$ORG_INSTANCE_URL" \
+            --alias org \
+            --set-default
+
+      - name: Calcular el delta del commit fusionado
+        env:
+          FROM_SHA: ${{ github.event.before }}
+        run: |
+          mkdir -p delta
+          sf sgd source delta \
+            --to HEAD \
+            --from "$FROM_SHA" \
+            --output-dir delta \
+            --generate-delta \
+            --ignore-whitespace \
+            --ignore .sgdignore
+          if grep -q "<types>" delta/package/package.xml; then
+            echo "MODO=delta" >> "$GITHUB_ENV"
+            cat delta/package/package.xml
+          else
+            echo "MODO=vacio" >> "$GITHUB_ENV"
+          fi
+          if [ -f delta/destructiveChanges/destructiveChanges.xml ] && grep -q "<types>" delta/destructiveChanges/destructiveChanges.xml; then
+            echo "DESTRUCTIVE=si" >> "$GITHUB_ENV"
+          else
+            echo "DESTRUCTIVE=no" >> "$GITHUB_ENV"
+          fi
+
+      - name: Desplegar el delta
+        if: env.MODO == 'delta' && env.DESTRUCTIVE == 'no'
+        run: |
+          sf project deploy start \
+            --manifest delta/package/package.xml \
+            --test-level NoTestRun \
+            --target-org org \
+            --wait 30
+
+      - name: Desplegar el delta con borrados
+        if: env.MODO == 'delta' && env.DESTRUCTIVE == 'si'
+        run: |
+          sf project deploy start \
+            --manifest delta/package/package.xml \
+            --post-destructive-changes delta/destructiveChanges/destructiveChanges.xml \
+            --test-level NoTestRun \
+            --target-org org \
+            --wait 30
+
+      - name: Nada que desplegar
+        if: env.MODO == 'vacio'
+        run: echo "Este commit no trae metadata."

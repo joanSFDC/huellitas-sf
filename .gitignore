@@ -37,3 +37,8 @@ sfca_results.json
 
 # Local environment variables
 .env
+
+# Certificado JWT
+server.key
+server.csr
+*.pem
