@@ -68,6 +68,16 @@ Como el pipeline genera dinámicamente el manifest que realmente importa para el
 
 Cada vez que hagas un `git pull` para traer los últimos cambios de la rama principal (que refleja el estado de la Org Core), es fundamental recordar que **los cambios solo se descargan en tu repositorio local (tu computadora)**. Tu entorno de desarrollo de Salesforce (tu Org) no se actualiza automáticamente.
 
+**👁️j👁️ (OJO) - Sincronización exclusiva en tu SDO:**
+> Esta sincronización de metadatos se realiza **únicamente hacia la SDO de tu frente** (f1, f2, f3 o f4). Bajo ninguna circunstancia debes intentar desplegar desde tu entorno local hacia la Org Core (aunque por seguridad no tienes las credenciales de la Core, es vital mantener el orden de los entornos).
+
+Para evitar confusiones o errores de despliegue, asegúrate de que tu proyecto local esté apuntando siempre a tu SDO antes de hacer un deploy:
+
+* **Vía VS Code:** Revisa la barra inferior (footer) de tu editor. Ahí debe aparecer el alias de tu SDO. Si aparece otra organización o dice "No Default Org Set", haz clic ahí y selecciona la tuya.
+* **Vía Terminal (CLI):** 
+  * Para verificar a qué Org estás apuntando actualmente: `sf config get target-org`
+  * Para establecer tu SDO como la predeterminada para todos los comandos: `sf config set target-org <alias-de-tu-sdo>`
+
 **Pasos obligatorios después de un `git pull`:**
 
 1. **Actualizar tu rama local:**
@@ -86,7 +96,7 @@ Cada vez que hagas un `git pull` para traer los últimos cambios de la rama prin
 La rama `main` está protegida. **El pipeline es la única vía a la organización Base: TODO cambio llega por PR**. Esto incluye metadatos de Salesforce, documentación, Runbooks y decisiones de arquitectura (ADRs). 
 
 * **Revisiones:** Todos los PRs deben pasar por una revisión técnica a cargo de Joan y Duván. 
-* **Aprobación y Merge:** Únicamente Edgar aprueba y fusiona los PRs en la rama principal (en dos ventanas diarias definidas).
+* **Aprobación y Merge:** En la mayoría de los casos, Edgar aprueba y fusiona los PRs en la rama principal (en dos ventanas diarias definidas).
 * **Prohibición estricta:** Ningún desarrollador puede hacer cambios manuales directamente en el "Setup" de la Org Base. Todo se construye y prueba en las SDOs (Scratch/Developer Orgs) de cada pareja antes de enviar el PR.
 
 ---
