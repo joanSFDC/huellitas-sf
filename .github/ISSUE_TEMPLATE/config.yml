@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Dudas sobre cómo crear los issues
+    url: https://salesforce.enterprise.slack.com/archives/C0BFU4L6QUT
+    about: Si no sabes qué plantilla usar o tienes dudas del flujo, consulta al equipo etiquetando a un PM o al Frente 4.
