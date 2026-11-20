@@ -1,0 +1,84 @@
+name: Validar PR
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: huellitas-org
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  validar:
+    name: Validar
+    runs-on: ubuntu-latest
+    steps:
+      - name: Bajar el repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Instalar Salesforce CLI
+        run: npm install --global @salesforce/cli
+
+      - name: Instalar sfdx-git-delta y Code Analyzer
+        run: |
+          echo y | sf plugins install sfdx-git-delta
+          echo y | sf plugins install @salesforce/plugin-code-analyzer
+
+      - name: Guardar la llave JWT
+        run: |
+          mkdir -p "$RUNNER_TEMP/jwt"
+          printf '%s\n' "$JWT_KEY" > "$RUNNER_TEMP/jwt/server.key"
+          chmod 600 "$RUNNER_TEMP/jwt/server.key"
+        env:
+          JWT_KEY: ${{ secrets.ORG_JWT_KEY }}
+
+      - name: Autenticar contra la org
+        run: |
+          sf org login jwt \
+            --client-id "$ORG_CLIENT_ID" \
+            --jwt-key-file "$RUNNER_TEMP/jwt/server.key" \
+            --username "$ORG_USERNAME" \
+            --instance-url "$ORG_INSTANCE_URL" \
+            --alias org \
+            --set-default
+        env:
+          ORG_CLIENT_ID: ${{ secrets.ORG_CLIENT_ID }}
+          ORG_USERNAME: ${{ secrets.ORG_USERNAME }}
+          ORG_INSTANCE_URL: ${{ secrets.ORG_INSTANCE_URL }}
+
+      - name: Code Analyzer
+        run: sf code-analyzer run --workspace force-app --view table
+
+      - name: Calcular el delta contra main
+        run: |
+          mkdir -p delta
+          sf sgd source delta \
+            --to HEAD \
+            --from origin/main \
+            --output-dir delta \
+            --generate-delta \
+            --ignore-whitespace
+          if [ -s delta/package/package.xml ]; then
+            echo "MODO=delta" >> "$GITHUB_ENV"
+            cat delta/package/package.xml
+          else
+            echo "MODO=vacio" >> "$GITHUB_ENV"
+          fi
+
+      - name: Validar el delta
+        if: env.MODO == 'delta'
+        run: |
+          sf project deploy validate \
+            --manifest delta/package/package.xml \
+            --test-level NoTestRun \
+            --target-org org \
+            --wait 30
+
+      - name: Nada que validar
+        if: env.MODO == 'vacio'
+        run: echo "El pull request no trae metadata nueva ni modificada."
