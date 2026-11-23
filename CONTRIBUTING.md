@@ -4,6 +4,22 @@ Querido Intern de Talent Inc Colombia:
 
 Para mantener el historial de cambios limpio, organizado y compatible con nuestros flujos de despliegue, es obligatorio seguir las siguientes convenciones al nombrar ramas y redactar mensajes de commit.
 
+Antes de empezar, te presentamos el mapa del repositorio, para que sepas dónde está cada cosa.
+
+## Estructura de la documentación
+
+```text
+docs/
+├── adr/          # Architecture Decision Records (decisiones técnicas y de arquitectura)
+├── decisiones/   # Acuerdos y decisiones funcionales o de negocio
+├── discovery/    # Levantamiento de requerimientos, análisis e investigación inicial
+├── hu/           # Historias de usuario y criterios de aceptación
+├── manuales/     # Guías de usuario y manuales técnicos
+├── orgs/         # Configuración, detalles y gestión de entornos/orgs de Salesforce
+├── propuesta/    # Propuesta inicial, alcance y objetivos del proyecto
+├── qa/           # Planes de prueba, casos de prueba y evidencias de calidad
+└── runbook/      # Procedimientos operativos, despliegues y guías de soporte
+```
 ---
 
 ## 1. Convención de Commits
